@@ -9,3 +9,22 @@ function scrollToElement(selector){
         scrollTop: offTop
     }, 2000);
 }
+
+/**
+ *  encode the selected string into UTF-8
+ * @param {String} s
+ * @returns {String}
+ */
+function encode_utf8(s) {
+  return unescape(encodeURIComponent(s));
+}
+
+
+/**
+ * decode the selected string into UTF-8
+ * @param {String} s
+ * @returns {String}
+ */
+function decode_utf8(s) {
+  return decodeURIComponent(escape(s));
+}
