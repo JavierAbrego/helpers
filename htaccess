@@ -1,0 +1,6 @@
+#################
+#htaccess rewrite all urls to index.html
+#################
+RewriteEngine on
+RewriteCond $1 !^(index\.html|images|robots\.txt|tarifas\.pdf)
+RewriteRule ^(.*)$ /index.html/$1 [L]
