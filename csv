@@ -1,0 +1,9 @@
+
+Change the separator
+=========================
+Open the CSV file with a decent text editor like Notepad++ and add the following text in the first line:
+
+sep=,
+Now open it with excel again.
+
+This will set the separator as a comma, or you can change it to whatever you need.
