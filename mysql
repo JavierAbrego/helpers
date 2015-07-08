@@ -1,0 +1,8 @@
+#Set log of slow queries
+SET GLOBAL log_slow_queries = 1;
+
+#check if mysql is logging slow queries
+SELECT variable_value FROM information_schema.global_variables WHERE variable_name IN ('slow_query_log','slow_query_log_file','long_query_time');
+
+#read log
+mysqldumpslow
