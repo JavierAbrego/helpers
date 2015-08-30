@@ -1,0 +1,70 @@
+
+1)Create the keystore
+
+Whatever I put in /etc/tomcat6/sever.xml the keystore used buy Tomcat6 was : /usr/share/tomcat6/.keystore
+The command to create the keystore is:
+
+Code:
+keytool -genkey -alias tomcat -keyalg RSA -keysize 2048 -keystore /usr/share/tomcat6/.keystore
+
+
+You'll be asked for several info.
+
+2 things important:
+-Use domain name for First name and Last name info. (ex: http://www.mywebsite.com)
+-Use same password for the keystore as the one you'll use for the cert.
+
+
+2)Edit /etc/tomcat6/server.xml
+
+remove the comment (<!-- and -->) before and after this connector:
+
+Code:
+<Connector 
+           port="8443" maxThreads="200"
+           scheme="https" secure="true" SSLEnabled="true"
+           keystoreFile="${user.home}/.keystore" keystorePass="changeit"
+           clientAuth="false" sslProtocol="TLS"/>
+
+
+3)Create a local Certificate and Signing Request (CSR)
+
+With these commands:
+
+Code:
+keytool -genkey -alias tomcat -keyalg RSA -keysize 2048 -keystore /usr/share/tomcat6/.keystore
+
+keytool -certreq -keyalg RSA -alias tomcat -keysize 2048 -file certreq.csr -keystore /usr/share/tomcat6/.keystore
+
+
+4)Submit the CSR to the Certificate Authority
+
+StartCom in this case and get your trusted certificate. (Copy/Paste certificate data in a file)
+
+5) Get complementary certs.
+
+From the tool box get the CA root certificate and class corresponding certificate.
+Here: http://www.startssl.com/certs/ca.pem
+and
+Here: http://www.startssl.com/certs/sub.class1.server.ca.pem
+
+6)Import the 2 StartCom Certificates:
+
+Code:
+keytool -import -alias startcom.ca -keystore /usr/share/tomcat6/.keystore -trustcacerts -file "Path to Startcom Root Ca cert (CA.pem)"
+
+keytool -import -alias startcom.ca.sub -keystore /usr/share/tomcat6/.keystore -file "Path to Startcom sub  class Ca Cert (sub.class1.server.ca.pem)"
+
+
+7)Import your Trusted Certficate
+
+Code:
+keytool -import -alias tomcat -keystore /usr/share/tomcat6/.keystore -file "Path to your certficate"
+
+
+8) Optional
+
+In case where the keystore should be stored in the HomeDir:
+Code:
+cp -keystore /usr/share/tomcat6/.keystore /home/"user directory"/
+chown "username":"username" /home/"user directory"/.keystore
