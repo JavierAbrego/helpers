@@ -5,3 +5,8 @@ As loopback devices (like localhost) do not use the prerouting rules, if you nee
 
 # iptables -t nat -I OUTPUT -p tcp -d 127.0.0.1 --dport 80 -j REDIRECT --to-ports 8080
 NOTE: The above solution is not well suited for multi-user systems, as any user can open port 8080 (or any other high port you decide to use), thus intercepting the traffic..
+
+
+#restrict VNC to localhost
+iptables -A INPUT -p tcp -s localhost --dport 5901 -j ACCEPT
+iptables -A INPUT -p tcp --dport 5901 -j DROP
