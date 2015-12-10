@@ -10,3 +10,8 @@ NOTE: The above solution is not well suited for multi-user systems, as any user 
 #restrict VNC to localhost
 iptables -A INPUT -p tcp -s localhost --dport 5901 -j ACCEPT
 iptables -A INPUT -p tcp --dport 5901 -j DROP
+
+#drop all ports except
+iptables -A INPUT -p tcp --dport X -j ACCEPT
+iptables -A INPUT -p tcp --dport Y -j ACCEPT
+iptables -A INPUT -p tcp -j DROP
