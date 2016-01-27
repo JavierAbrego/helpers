@@ -1,0 +1,76 @@
+https://engineering.gosquared.com/expanding-a-cassandra-cluster
+
+Recently I was tasked with migrating an existing DataStax Cassandra cluster to a different availability zone (AZ) in AWS EC2. The existing cluster’s nodes were m1.xlarge instances running the DataStax Community AMI, with Cassandra 1.2.8-1 installed.
+
+The migration strategy is fairly simple. The cluster can be migrated one node at a time, by setting up an equivalent number of nodes in the other AZ, adding them into the existing cluster, and then decommissioning each node in the original AZ one by one. This way, the migration is performed gradually while the cluster is online, and without any interruption in service.
+
+1. Understand the DataStax Cassandra AMI
+It is essential to be running the same version of Cassandra on all nodes in a cluster. Initially I assumed the DataStax AMI was packaged with the same Cassandra version and configuration, such that if you booted new instances with the same AMI as the existing cluster, the same version of Cassandra would be set up. I booted up some new nodes with the same AMI to verify this.
+
+As it turns out, the new nodes were instead running the latest release, which is Cassandra 2.0.1 as of today (2013-10-11), not 1.2.8. I decided to do some digging on how the AMI was put together.
+
+I discovered that the DataStax AMI is built by a collection of python scripts in the ComboAMI repository. Once set up, the AMI has this repository cloned locally to /home/ubuntu/datastax_ami and puts a boot script in /etc/init.d which invokes the /home/ubuntu/datastax_ami/ds0_updater.py script. This means that each time the image is booted, it updates the python setup scripts and tries to install the latest version of DataStax and Cassandra by default.
+
+Don’t worry, there’s a way we can specify which version of Cassandra to install. Onto the next step…
+
+2. Launch the new nodes
+It’s time to decide how many new nodes to add to the cluster. If you are simply expanding a cluster in a single AZ, you can add as many nodes as you wish.
+
+If you are running a cluster spanning multiple AZs, you need to think a bit more about how many nodes you have in each AZ. This is because on EC2, the DataStax AMI sets up Cassandra to use the EC2Snitch. The EC2Snitch maps EC2 AZs to ‘racks’ in Cassandra. Since Cassandra tries to make sure it distributes replicas across racks as evenly as possible, it’s advisable to ensure you have at least an equal number of instances in each AZ to avoid an imbalance of data volume in any AZ.
+
+Once you know how many nodes you’re launching, you can follow the DataStax Documentation on launching the EC2 AMI to get them set up. If you don’t want to have the latest Cassandra release installed, you need to include the –release option in the instance user data. This option is not mentioned in the DataStax documentation, but is documented in the ComboAMI README:
+
+
+--release <release_version>
+Allows for the installation of a previous DSE version
+Example: 1.0.2
+Default: Ignored
+
+For example, to launch Cassandra 1.2.8 instances, your user data options will be something like the following:
+
+
+--clustername myDSCcluster --totalnodes # --version community --release 1.2.8
+
+Remember to change # to the number of nodes you are launching.
+
+Alternatively, I found another python tool called cassandralauncher written by the author of ComboAMI. It is a CLI tool designed to handle configuring and launching a cluster of nodes for you right from the comfort of your command prompt.
+
+3. Preparing the new nodes
+Follow the documentation for adding nodes to an existing cluster.
+
+Stop Cassandra, remove the data, and start making the config changes.
+
+Since I was adding nodes running on m1.large instances to a cluster of nodes running on m1.xlarge instances, I halved the num_tokens value to 128 on the new nodes to ensure their token allocation is proportional to their instance capabilities.
+
+At this point I also enabled incremental_backups for a backup script I wrote.
+
+Changing the cluster_name and seed_ips options to match your existing cluster will mean that once Cassandra is restarted on these new nodes with this config, they will be introduced to the existing cluster.
+
+Also make sure you set auto_bootstrap to true to make sure the new node streams its portion of data from other nodes when it joins the cluster.
+
+4. New nodes, meet the cluster
+Once you’re happy with the config, it’s time to restart Cassandra on each new node so they join the cluster. Before starting Cassandra back up, double check your config to ensure the cluster name, seed IPs, snitch, auto_bootstrap and any other config values are all set and correct. Also check that the security group settings for the nodes’ instances are correct to ensure there won’t be any firewalling getting in the way of node comms.
+
+Slowly add the new nodes to your existing cluster by running service cassandra start on each one. The docs say you should wait two minutes between node initialisations, but I actually prefer to wait until all the data has finished streaming to the new node, or at least until it shows up in nodetool status. How many nodes you can add at a time depends on your replication factor and number of nodes in the cluster, but for safety it’s simpler to add one at a time.
+
+Once you start Cassandra on a new node, it will contact the seed IP for ring information, and begin the data streaming process and joining the cluster. Once streaming is complete, it will show up as part of the cluster. This could take a while depending on how much data needs to be transferred to the new node.
+
+While you’re waiting, the OpsCenter ring view offers a useful visualisation of node states and data migration:
+
+DataStax Cassandra node visualisation
+
+5. Decommissioning old nodes
+If you only needed to add nodes to an existing cluster, congratulations, you’re done! If you’re migrating an existing cluster, you’re nearly there, this is the last step.
+
+Assuming you’ve booted at least the number of new nodes you’ll need to take on the load of the original nodes, you can now start to decommission the old nodes.
+
+Before doing so, make sure your applications have been updated to use the new nodes as their Cassandra hosts, so we don’t get any nasty surprises when the original nodes are shut down.
+
+Run nodetool decommission on each original node. This will tell the node to stop receiving writes, flush its data to disk, and start transferring its data to other nodes in the cluster. Wait until the node has finished fully decommissioning and no longer shows up in nodetool status before shutting down the instance and moving onto the next node.
+
+Wrapping up
+It’s useful to inspect the logs on nodes at every step of this process, just so you can observe what’s going on and follow what Cassandra is doing: tail -f /var/log/cassandra/*.log
+
+The OpsCenter UI is also useful for stats and visualisations of cluster activity.
+
+Even though I was working with Cassandra 1.2.8, the links to official DataStax Cassandra documentation (as of today) were for the v2 documentation rather than v1.2. By and large the documentation pages I linked to did not differ in crucial content, and the v2 docs as a whole are probably more up to date. Be aware of the versions of Cassandra the docs are written for, though, to make sure you don’t try something incompatible.
