@@ -1,3 +1,28 @@
+/*
+* Debug changes in an object property
+*/
+console = console || {}; // just in case
+console.watch = function(oObj, sProp) {
+   sPrivateProp = "$_"+sProp+"_$"; // to minimize the name clash risk
+   oObj[sPrivateProp] = oObj[sProp];
+
+   // overwrite with accessor
+   Object.defineProperty(oObj, sProp, {
+       get: function () {
+           return oObj[sPrivateProp];
+       },
+
+       set: function (value) {
+           //console.log("setting " + sProp + " to " + value); 
+           debugger; // sets breakpoint
+           oObj[sPrivateProp] = value;
+       }
+   });
+}
+
+console.watch(this, "propName");
+
+
 /**
  * Scroll to the element with the specified selector
  * @param {String} element //for example "#idSelector"
