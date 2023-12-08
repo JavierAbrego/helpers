@@ -3,6 +3,8 @@
 ```
 # service kubelet restart
 # journalctl -xe
+> search for fatal errors
+# sudo journalctl -xe | egrep ": [F][0-9]" -B 1
 # tail -f /var/log/syslog
 ```
 
